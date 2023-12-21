@@ -1,40 +1,97 @@
-import altair as alt
-import numpy as np
-import pandas as pd
+from dotenv import load_dotenv
+from openai import OpenAI
+from langchain.chat_models import ChatOpenAI
+from langchain.prompts import ChatPromptTemplate
+from langchain.vectorstores.faiss import FAISS
+from langchain.embeddings import OpenAIEmbeddings
+from langchain.schema.output_parser import StrOutputParser
+from langchain_core.runnables import RunnablePassthrough
+from langchain.prompts.chat import ChatPromptTemplate, SystemMessagePromptTemplate,HumanMessagePromptTemplate
 import streamlit as st
+import os, yaml
 
-"""
-# Welcome to Streamlit!
+# Carga las variables de entorno desde .env
+load_dotenv()
 
-Edit `/streamlit_app.py` to customize this app to your heart's desire :heart:.
-If you have any questions, checkout our [documentation](https://docs.streamlit.io) and [community
-forums](https://discuss.streamlit.io).
+# Carga en memoria el indice de FAISS
+embeddings = OpenAIEmbeddings()
+db = FAISS.load_local("faiss_index", embeddings)
 
-In the meantime, below is an example of what you can do with just a few lines of code:
-"""
+# Define modelo y el avatar
+gopher = "https://github.com/AI-ML-Lab/resources/blob/main/images/golang2.jpg?raw=true"
+model = ChatOpenAI(model="gpt-3.5-turbo")
 
-num_points = st.slider("Number of points in spiral", 1, 10000, 1100)
-num_turns = st.slider("Number of turns in spiral", 1, 300, 31)
+# Crea el agente router
+system_message_prompt = SystemMessagePromptTemplate.from_template(yaml.safe_load(open("templates.yaml"))['ROUTER'])
+human_message_prompt = HumanMessagePromptTemplate.from_template("{question}")
+router_template = ChatPromptTemplate.from_messages([system_message_prompt, human_message_prompt])
+router = router_template | model
 
-indices = np.linspace(0, 1, num_points)
-theta = 2 * np.pi * num_turns * indices
-radius = indices
+# Función para crear una cadena basada en el resultado del router
+def create_chain(route):
+    template = ChatPromptTemplate.from_template(yaml.safe_load(open("templates.yaml"))[route])
+    chain = (
+        {"context": RunnablePassthrough(), "query": RunnablePassthrough()} 
+        | template
+        | model
+        | StrOutputParser()
+    )
+    return chain
 
-x = radius * np.cos(theta)
-y = radius * np.sin(theta)
+# Función para hacer streaming de la respuesta de la cadena
+def stream_and_process_chunks(stream_generator, message_placeholder):
+    full_response = ""
+    for chunk in stream_generator:
+        new_content = chunk.choices[0].delta.content if 'choices' in chunk else chunk
+        full_response += new_content or ""
+        message_placeholder.markdown(full_response + "▌")
+    return full_response
 
-df = pd.DataFrame({
-    "x": x,
-    "y": y,
-    "idx": indices,
-    "rand": np.random.randn(num_points),
-})
+# Header
+col1, col2 = st.columns(2)
+with col1:
+    st.title("Spear Education")
+    st.caption("🚀A Spear Education chatbot powered by LLMs")
+with col2:
+    st.image("./golang.jpg")
+    
+# Se crea el canvas de mensajes    
+if "messages" not in st.session_state:
+    st.session_state["messages"] = [{"role": "assistant", "content": "Hi! How can I help you today?"}]
 
-st.altair_chart(alt.Chart(df, height=700, width=700)
-    .mark_point(filled=True)
-    .encode(
-        x=alt.X("x", axis=None),
-        y=alt.Y("y", axis=None),
-        color=alt.Color("idx", legend=None, scale=alt.Scale()),
-        size=alt.Size("rand", legend=None, scale=alt.Scale(range=[1, 150])),
-    ))
+for msg in st.session_state.messages:
+    if msg['role'] =='assistant':
+        st.chat_message(msg["role"], avatar=gopher).write(msg["content"])
+    else:
+        st.chat_message(msg["role"]).write(msg["content"])
+
+# Lógica de chat
+if prompt := st.chat_input():
+    st.session_state.messages.append({"role": "user", "content": prompt})
+    st.chat_message("user").write(prompt)
+    message_placeholder = st.empty()
+    full_response = ""
+
+    # Consulta el router
+    route = router.invoke({"question": f"{prompt}"})
+    route_type = route.content
+    #st.write(route_type)
+    # Procesa y muestra cada chunk según el tipo de ruta
+    if route_type == 'GENERIC':
+        client = OpenAI(api_key=os.getenv('OPENAI_API_KEY'))
+        for chunk in client.chat.completions.create(model="gpt-3.5-turbo", messages=st.session_state.messages, stream=True):
+                full_response += (chunk.choices[0].delta.content or "")
+                message_placeholder.markdown(full_response + "▌")
+                message_placeholder.markdown(full_response)
+        msg = full_response
+    else:
+        # Consulta la base vectorial **Esto podría paralelizarse**
+        docs = db.similarity_search(prompt)
+        try:
+            chain = create_chain(route_type)
+        except:
+            st.write('except_community')
+            chain = create_chain('COMMUNITY')
+        msg = stream_and_process_chunks(chain.stream({"context": docs, "query": st.session_state.messages}), message_placeholder)
+
+    st.session_state.messages.append({"role": "assistant", "content": msg})

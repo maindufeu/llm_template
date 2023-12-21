@@ -1,0 +1,10 @@
+version: '3.8'
+services:
+  web:
+    build: .
+    ports:
+      - "8501:8501"
+    volumes:
+      - .:/app
+    environment:
+      - OPENAI_API_KEY=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

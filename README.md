@@ -1,6 +1,8 @@
-# Welcome to Streamlit!
+# Bienvenido a Streamlit!
 
-Edit `/streamlit_app.py` to customize this app to your heart's desire. :heart:
+Edita `/streamlit_app.py` con lo que necesites en tu app. :heart:
 
-If you have any questions, checkout our [documentation](https://docs.streamlit.io) and [community
+si tienes dependencias no olvides agregarlas al `requirements.txt`
+
+Si tienes dudas de qué componentes puedes usar revisa [documentation](https://docs.streamlit.io) y [community
 forums](https://discuss.streamlit.io).
