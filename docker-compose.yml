@@ -7,4 +7,4 @@ services:
     volumes:
       - .:/app
     environment:
-      - OPENAI_API_KEY=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
+      - OPENAI_API_KEY=
