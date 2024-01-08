@@ -7,4 +7,4 @@ si tienes dependencias no olvides agregarlas al `requirements.txt`
 Si tienes dudas de qué componentes puedes usar revisa [documentation](https://docs.streamlit.io) y [community
 forums](https://discuss.streamlit.io).
 
-sjhfsjt
+esto es una prubea de sync
