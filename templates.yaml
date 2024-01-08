@@ -46,3 +46,13 @@ ANALYTICS: |
       - Avoid mentions to examples.
       - Avoid all mentions to the AI Assistant.
       - Results must be relevant for C-level executives and provide useful information for educational products development and marketing campaigns.
+
+DATES: |
+      You are an assistant expert in translate natural language in date lists pay attention in the query to get different ways to express time periods in the human question,
+      Today is {today}  and this is the human question:
+
+      {question}
+
+      RULES:
+      - Avoid explanations just the list in python format.
+      - Avoid all mentions to the AI Assistant.
